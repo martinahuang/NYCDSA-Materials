@@ -1,0 +1,261 @@
+---
+title: "Diagrams"
+output: html_notebook
+---
+
+```{r, include=FALSE}
+#knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Packages
+
+```{r, message=FALSE}
+library(plotly)
+library(htmlwidgets) # for saving figures (with saveWidget function)
+library(htmltools)
+```
+
+# A/B Test
+
+## A/B Test - Definition {.smaller}
+
+```{r}
+# Define minimum set of variables that fully define the A/B test results
+t = 20     # Total number of subjects (A + B)
+a = 10     # Number of subjects in group A
+b = 10     # Number of subjects in group B
+a_yes = 7  # Number of successes (yes) in group A
+b_yes = 4  # Number of successes (yes) in group B
+
+# Compute remaining A/B test results (using the variables above)
+a_no = a - a_yes                # Number of failures (no) in group A
+b_no = b - b_yes                # Number of failures (no) in group B
+t_yes = a_yes + b_yes           # Total (A + B) successes (yes)
+t_no  = a_no  + b_no            # Total (A + B) failures (no)
+a_yes_pc = 100 * a_yes / a      # Percentage of successes (yes) in group A
+b_yes_pc = 100 * b_yes / b      # Percentage of successes (yes) in group B
+ab_yes_pc = a_yes_pc - b_yes_pc # Test statistic: Yes percentage diff. (A - B)
+
+cat('Yes Rate (%):\n   A:', a_yes_pc, '\n   B:', b_yes_pc, '\n A-B:', ab_yes_pc)
+```
+
+## A/B Test - Dataframe {.smaller}
+
+```{r}
+set.seed(0) # For reproducible results
+
+sub_rand = sample(1:t) # Subject randomization (for step 2)
+
+# A/B results (for step 3): -1 = No, 0 = NA, +1 = Yes
+ab_res = c(sample(rep(c(+1, -1), c(a_yes, a_no))),
+           sample(rep(c(+1, -1), c(b_yes, b_no))))
+
+# Data frame for animations
+ab_df = data.frame(
+  # A/B steps:   Step 1,    Step 2,    Step 3
+  step    = c(rep(1, t), rep(2, t), rep(3, t)), # A/B step
+  sub_y   = c(      1:t,       1:t,       1:t), # Subject y position
+  sub_id  = c(      1:t,  sub_rand,  sub_rand), # Subject ID
+  sub_col = c(rep(0, t), rep(0, t),    ab_res)  # Subject color (A/B result)
+)
+
+ab_df
+```
+
+## A/B Test - Create Base Fig
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+shapes = list(
+  list(type="rect", x0=0.8, x1=1.2, y0=0.5,  y1=20.5),
+  list(type="rect", x0=1.8, x1=2.2, y0=0.5,  y1=10.5),
+  list(type="rect", x0=1.8, x1=2.2, y0=10.5, y1=20.5),
+  list(type="rect", x0=2.8, x1=3.2, y0=0.5,  y1=10.5),
+  list(type="rect", x0=2.8, x1=3.2, y0=10.5, y1=20.5),
+  list(type="rect", x0=2.2, x1=2.8, y0=0.5,  y1=10.5, fillcolor="blue", opacity=0.2),
+  list(type="rect", x0=2.2, x1=2.8, y0=10.5, y1=20.5, fillcolor="yellow", opacity=0.2)
+)
+
+annotations = list(
+  list(x=2.5, y=5.5, text="A", showarrow=FALSE, font=list(size=20)),
+  list(x=2.5, y=15.5, text="B", showarrow=FALSE, font=list(size=20)),
+  list(x=3.6, y=5.5, text="A: 70%", showarrow=FALSE, font=list(size=18)),
+  list(x=3.6, y=15.5, text="B: 40%", showarrow=FALSE, font=list(size=18)),
+  list(x=3.6, y=10.5, text="A-B: 30%", showarrow=FALSE, font=list(size=18))
+)
+
+x_labels = list("Step 1\nAll subjects", "Step 2\nRandomization", "Step 3\nResults")
+x_axis = list(title="", range = c(0.5, 4.2), tickvals = list(1, 2, 3),
+              ticktext = x_labels)
+y_axis = list(title="", range = c(0, 21), zeroline=FALSE, showline=FALSE,
+              showticklabels=FALSE, showgrid = FALSE)
+
+ab_base_fig = ab_df %>%
+  plot_ly(x=~step, y=~sub_y, color=~sub_col, colors=c("red", "black", "green3")) %>%
+  add_trace(marker=list(size=10), opacity=0.3) %>%
+  config(displayModeBar=FALSE) %>%
+  layout(annotations=annotations, margin=list(l=0, r=0, b=0, t=0, pad=0), 
+         shapes=shapes, xaxis=x_axis, yaxis=y_axis)
+
+ab_base_fig
+```
+
+## A/B Test - Create Steps Fig
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# (r chunk option: fig.height=5.5)
+ab_step_fig = ab_base_fig %>%
+  add_trace(marker=list(size=10), frame=~step, ids=~sub_id) %>%
+  hide_colorbar() %>%
+  layout(showlegend=FALSE)
+
+ab_step_fig
+```
+
+## A/B Test - Save Steps Fig
+
+```{r}
+saveWidget(ab_step_fig, "ab-steps-fig.html")
+```
+
+## A/B Test - `iframe`
+
+<iframe src="ab-steps-fig.html"></iframe>
+
+<!--
+<iframe src="ab-steps-fig.html" style="border: none;"></iframe>
+-->
+
+## A/B Test - `htmltools::tags$iframe`
+
+- Bad: Does not show in the R notebook.
+- Good: Shows in the presentation.
+
+```{r, echo=FALSE}
+#file_path = "ab-steps-fig.html"
+#htmltools::tags$iframe(src = file_path, scrolling = "no", 
+#                       seamless = "seamless", frameBorder = "0")
+```
+
+## A/B Test - `htmltools::includeHTML`
+
+- Bad: Does not show in the presentation
+- Good: Shows in the R notebook
+
+```{r, echo=FALSE}
+#htmltools::includeHTML("ab-steps-fig.html")
+```
+
+## A/B Test - Create Subjects Fig
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ab_sub_fig = ab_base_fig %>%
+  add_trace(mode="markers+lines", marker=list(size=10), frame=~sub_id,
+            line=list(color="gray")) %>% # dash="dot"
+  hide_colorbar() %>%
+  layout(showlegend=FALSE)
+
+ab_sub_fig
+```
+
+## A/B Test - Save Subjects Fig
+
+```{r}
+saveWidget(ab_sub_fig, "ab-subjects-fig.html")
+```
+
+# Permutation Test
+
+## Permutation Test - Dataframe {.smaller}
+
+```{r}
+set.seed(0) # For reproducible results
+
+sub_id_1 = c(which(ab_res == 1), which(ab_res == -1))
+sub_col_1 = c(rep(1, t_yes), rep(-1, t_no))
+
+perm_rand = sample(1:t)
+sub_id_2 = sub_id_1[perm_rand]
+sub_col_2 = sub_col_1[perm_rand]
+
+# Data frame for animations
+perm_df = data.frame(
+  # Perm steps:  Step 0,    Step 1,    Step 2
+  step    = c(rep(0, t), rep(1, t), rep(2, t)), # Permutation step
+  sub_y   = c(      1:t,       1:t,       1:t), # Subject y position
+  sub_id  = c(      1:t,  sub_id_1,  sub_id_2), # Subject ID
+  sub_col = c(   ab_res, sub_col_1, sub_col_2)  # Subject color (A/B result)
+)
+
+perm_df
+```
+
+## Permutation Test - Create Base Fig
+
+```{r}
+shapes = list(
+  list(type="rect", x0=-0.2, x1=0.2, y0=0.5,  y1=10.5),
+  list(type="rect", x0=-0.2, x1=0.2, y0=10.5,  y1=20.5),
+  list(type="rect", x0=0.8, x1=1.2, y0=0.5, y1=20.5),
+  list(type="rect", x0=1.8, x1=2.2, y0=0.5,  y1=10.5),
+  list(type="rect", x0=1.8, x1=2.2, y0=10.5, y1=20.5)
+)
+
+annotations = list(
+  list(x=-0.8, y=5.5, text="A: 70%", showarrow=FALSE, font=list(size=18)),
+  list(x=-0.8, y=15.5, text="B: 40%", showarrow=FALSE, font=list(size=18)),
+  list(x=-0.8, y=10.5, text="A-B: 30%", showarrow=FALSE, font=list(size=18)),
+  list(x=2.8, y=5.5, text="A: 50%", showarrow=FALSE, font=list(size=18)),
+  list(x=2.8, y=15.5, text="B: 60%", showarrow=FALSE, font=list(size=18)),
+  list(x=2.8, y=10.5, text="A-B: -10%", showarrow=FALSE, font=list(size=18))
+)
+
+x_labels = list("Step 0\nA/B Results", 'Step 1\n"Bag"', "Steps 2-5\nOne Permutation")
+x_axis = list(title="", range = c(-1.3, 3.4), tickvals = list(0, 1, 2),
+              ticktext = x_labels, zeroline=FALSE, showgrid=FALSE)
+y_axis = list(title="", range = c(0, 21), zeroline=FALSE, showline=FALSE,
+              showticklabels=FALSE, showgrid = FALSE)
+
+perm_base_fig = perm_df %>%
+  plot_ly(x=~step, y=~sub_y, color=~sub_col, colors=c("red", "black", "green3")) %>%
+  add_trace(type="scatter", mode="markers", marker=list(size=10), opacity=0.3) %>%
+  config(displayModeBar=FALSE) %>%
+  layout(annotations=annotations, margin=list(l=0, r=0, b=0, t=0, pad=0), 
+         shapes=shapes, xaxis=x_axis, yaxis=y_axis)
+
+perm_base_fig
+```
+
+## Permutation Test - Create Steps Fig
+
+```{r}
+perm_step_fig = perm_base_fig %>%
+  add_trace(type="scatter", mode="markers", marker=list(size=10), frame=~step, ids=~sub_id) %>%
+  hide_colorbar() %>%
+  layout(showlegend=FALSE)
+
+perm_step_fig
+```
+
+## Permutatio Test - Save Steps Fig
+
+```{r}
+saveWidget(perm_step_fig, "permutation-steps-fig.html")
+```
+
+## Permutation Test - Create Subjects Fig
+
+```{r}
+perm_sub_fig = perm_base_fig %>%
+  add_trace(type="scatter", mode="markers+lines", marker=list(size=10), frame=~sub_id) %>%
+  hide_colorbar() %>%
+  layout(showlegend=FALSE)
+
+perm_sub_fig
+```
+
+## Permutatio Test - Save Subjects Fig
+
+```{r}
+saveWidget(perm_sub_fig, "permutation-subjects-fig.html")
+```
+
